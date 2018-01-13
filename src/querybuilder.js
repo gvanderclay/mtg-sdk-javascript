@@ -1,25 +1,28 @@
-const request = require('request-promise')
-const config = require('./config.js')
-const { curryN, merge, prop } = require('ramda')
-const Emitter = require('emitter20')
+const request = require("request-promise");
+const config = require("./config.js");
+const { curryN, merge, prop } = require("ramda");
+const Emitter = require("emitter20");
 
 const get = curryN(3, (type, page, args) => {
+  const qs = args.page
+    ? args
+    : merge(args, {
+        page
+      });
   return request({
     uri: `${config.endpoint}/${type}`,
-    qs: merge(args, {
-      page
-    }),
+    qs,
     json: true
-  }).then(prop(type))
-})
+  }).then(prop(type));
+});
 
 module.exports = type => ({
-
   /** Gets a resource by its id. */
-  find: id => request({
-    uri: `${config.endpoint}/${type}/${id}`,
-    json: true
-  }),
+  find: id =>
+    request({
+      uri: `${config.endpoint}/${type}/${id}`,
+      json: true
+    }),
 
   /** Gets a resource with a given query. */
   where: get(type, 0),
@@ -31,22 +34,21 @@ module.exports = type => ({
       - end(): called when all results have been retrieved
   */
   all: args => {
-    const emitter = new Emitter()
+    const emitter = new Emitter();
     const getEmit = (type, page, args) => {
       return get(type, page, args)
-      .then(items => {
-        if (items.length > 0) {
-          items.forEach(c => emitter.trigger('data', c))
-          return getEmit(type, page + 1, args) // RECURSION
-        } else {
-          emitter.trigger('end')
-        }
-      })
-      .catch(err => emitter.trigger('error', err))
-    }
-    getEmit(type, 1, args)
+        .then(items => {
+          if (items.length > 0) {
+            items.forEach(c => emitter.trigger("data", c));
+            return getEmit(type, page + 1, args); // RECURSION
+          } else {
+            emitter.trigger("end");
+          }
+        })
+        .catch(err => emitter.trigger("error", err));
+    };
+    getEmit(type, 1, args);
 
-    return emitter
+    return emitter;
   }
-
-})
+});
